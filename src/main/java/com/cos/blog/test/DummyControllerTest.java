@@ -97,7 +97,7 @@ public class DummyControllerTest {
 			@Override
 			public IllegalArgumentException get() {
 				// TODO Auto-generated method stub
-				return new IllegalArgumentException("해당 유저는 없습니다. id : "+id); // 에러메시지를 볼 수 있다.
+				return new IllegalArgumentException("해당 사용자는 없습니다."); // 에러메시지를 볼 수 있다.
 			}
 		});
 		// 요청 : 웹 브라우저
