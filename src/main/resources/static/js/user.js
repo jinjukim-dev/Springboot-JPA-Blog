@@ -46,7 +46,14 @@ let index = {
 			password: $("#password").val(),
 			email: $("#email").val()
 		};
-
+		var password = $("#password").val();
+		
+		if(password == null || password == ""){
+			alert("비밀번호를 입력해주세요.");
+			history.go(0);
+		}
+			
+			
 		$.ajax({
 			type: "PUT",
 			url: "/user",
