@@ -33,7 +33,7 @@
 #### Lombok 이용
 - java 라이브러리로 반복되는 getter, setter 등등 줄여주는 코드 다이어트 라이브러리 사용
 - @Data - getter, setter 생성
-- @NoArgsConstructor - 기본생서앚
+- @NoArgsConstructor - 기본생성자
 - @AllArgsConstructor - 모든 필드값을 파라미터로 받는 생성자
 - @Builder - 빌더 패턴
 - @Entity - User 클래스가 Mysql에 테이블이 생성된다.
@@ -179,8 +179,117 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter{
 
 ```
 ### 🚩 OAuth2.0
-[OAuth2.0 개념]()
-- KakaoLogin 구현해보기
+[OAuth2.0 개념](https://velog.io/@jinjukim-dev)
+- KakaoLogin 구현
+- KakaoProfile.java
+- OAuthToken.java
+
+- UserController.java
+```java
+@GetMapping("/auth/kakao/callback")
+	public String kakaoCallback(String code) { // Data를 리턴해주는 컨트롤러 함수
+		
+		// POST방식으로 key=value 데이터를 요청(카카오 쪽으로)
+		// Retrifit2
+		// OkHttp
+		// RestTemplate
+		
+		RestTemplate rt = new RestTemplate();
+		
+		/* 헤더 값 넣어주기*/
+		// HttpHeader 오브젝트 생성
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+		
+		/* 바디 값 넣어주기*/
+		// HttpBody 오브젝트 생성
+		MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+		params.add("grant_type", "authorization_code");
+		params.add("client_id", "/* kakao에서 받은 cliendkey 넣어주기*/");
+		params.add("redirect_uri", "http://localhost:8000/auth/kakao/callback");
+		params.add("code", code); // 코드는 동적
+		
+		// HttpHeader와 HttpBody를 하나의 오브젝트(Map)에 담기
+		HttpEntity<MultiValueMap<String, String>> kakaoTokenRequest = new HttpEntity<>(params, headers);
+		
+		// Http 요청하기 - POST 방식으로 - response 변수의 응답 받음
+		ResponseEntity<String> response = rt.exchange(
+					"https://kauth.kakao.com/oauth/token", // 토큰 요청 발급 주소
+					HttpMethod.POST,
+					kakaoTokenRequest,
+					String.class  // responseEntity의 응답을 String으로 받음
+		);
+		
+		// json data를 자바 오브젝트로 처리하기 위해서 
+		// Gson, Json Simple, ObjectMapper
+		ObjectMapper objectMapper = new ObjectMapper();
+		OAuthToken oauthToken = null;
+		
+		try {
+			oauthToken = objectMapper.readValue(response.getBody(), OAuthToken.class);
+		} catch (JsonProcessingException e) {			
+			e.printStackTrace();
+		}
+		
+		System.out.println("카카오 엑세스 토큰 : "+oauthToken.getAccess_token());
+		
+		RestTemplate rt2 = new RestTemplate();
+		
+		// HttpHeader 오브젝트 생성
+		HttpHeaders headers2 = new HttpHeaders();
+		headers2.add("Authorization", "Bearer "+oauthToken.getAccess_token());
+		headers2.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+		
+		// HttpHeader와 HttpBody를 하나의 오브젝트에 담기
+		HttpEntity<MultiValueMap<String, String>> kakaoProfileRequest2 = 
+				new HttpEntity<>(headers2);
+		
+		// Http 요청하기 - POST 방식으로 - response 변수의 응답 받음
+		ResponseEntity<String> response2 = rt2.exchange(
+					"https://kapi.kakao.com/v2/user/me", // 토큰 요청 발급 주소 (토큰을 통한 사용자 정보 조회)
+					HttpMethod.POST,
+					kakaoProfileRequest2,
+					String.class  // responseEntity의 응답을 String으로 받음
+		);
+
+		ObjectMapper objectMapper2 = new ObjectMapper();
+		KakaoProfile kakaoProfile = null;
+		
+		try {
+			kakaoProfile = objectMapper2.readValue(response2.getBody(), KakaoProfile.class);
+		} catch (JsonProcessingException e) {			
+			e.printStackTrace();
+		}
+		
+		// User 오브젝트 : username, password, email
+		// kakaoLogin username : 카카오계정이메일 + 카카오 프로필 아이디
+		// kakaoLogin password : coskey값
+		// kakaoLogin email : 카카오 이메일
+		User kakaoUser = User.builder()
+				.username(kakaoProfile.getKakao_account().getEmail()+"_"+kakaoProfile.getId())
+				.password(cosKey)
+				.email(kakaoProfile.getKakao_account().getEmail())
+				.oauth("kakao")
+				.build();
+		
+		// 가입자 혹은 비가입자 체크 처리
+		User originUser = userService.회원찾기(kakaoUser.getUsername());
+		
+		if(originUser.getUsername() == null) {
+			System.out.println("신규 회원으로 자동 회원가입이 진행됩니다.");
+			userService.회원가입(kakaoUser);
+		}
+		
+		System.out.println("자동로그인을 진행합니다.");
+		// 로그인 처리
+		// 세션등록 - 토큰 만들어서 유저아이디, 비밀번호 날리기
+		Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(kakaoUser.getUsername(), cosKey));
+		SecurityContextHolder.getContext().setAuthentication(authentication);
+		
+		return "redirect:/";
+	}
+```
+
 
 ### 🚩 Ajax
 [Ajax 란?](https://velog.io/@jinjukim-dev/Ajax)
